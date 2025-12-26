@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Innovar | Estoque de Motos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<style>
+:root{
+  --verde:#1fa37a;
+  --verde-escuro:#0f5f46;
+  --cinza:#f2f2f2;
+  --branco:#fff;
+}
+
+body{
+  margin:0;
+  font-family:Arial, sans-serif;
+  background:var(--cinza);
+}
+
+header{
+  background:linear-gradient(135deg,var(--verde),var(--verde-escuro));
+  padding:12px;
+  text-align:center;
+}
+
+header img{
+  height:48px;
+}
+
+.container{
+  padding:15px;
+  margin-bottom:90px;
+}
+
+.card{
+  background:var(--branco);
+  padding:15px;
+  border-radius:14px;
+  margin-bottom:15px;
+}
+
+input,select,button{
+  width:100%;
+  padding:12px;
+  margin-top:8px;
+  border-radius:8px;
+  border:1px solid #ccc;
+  font-size:16px;
+}
+
+button{
+  background:var(--verde);
+  color:#fff;
+  border:none;
+  font-weight:bold;
+}
+
+.menu{
+  position:fixed;
+  bottom:0;
+  width:100%;
+  background:#fff;
+  display:flex;
+  gap:8px;
+  padding:10px;
+  border-top:2px solid var(--verde);
+}
+
+.hidden{display:none}
+
+.item{
+  display:flex;
+  gap:12px;
+}
+
+.item img{
+  width:110px;
+  height:85px;
+  object-fit:cover;
+  border-radius:10px;
+}
+
+.status{
+  padding:5px 10px;
+  border-radius:6px;
+  color:#fff;
+  font-size:13px;
+  display:inline-block;
+  margin-top:4px;
+}
+
+.Disponível{background:#2ecc71}
+.Negociando{background:#f39c12}
+.Reservada{background:#f1c40f;color:#000}
+.Vendida{background:#e74c3c}
+</style>
+</head>
+
+<body>
+
+<header>
+  <!-- LOGO EMBUTIDA -->
+  <img src="data:image/png;base64,COLE_AQUI_A_BASE64_DA_LOGO">
+</header>
+
+<div class="container">
+
+<div id="login" class="card">
+  <input id="luser" placeholder="Login">
+  <input id="lpass" type="password" placeholder="Senha">
+  <button onclick="entrar()">Entrar</button>
+</div>
+
+<div id="gerente" class="hidden">
+
+  <div class="card">
+    <h3>Criar vendedor</h3>
+    <input id="vNome" placeholder="Nome">
+    <input id="vLogin" placeholder="Login">
+    <input id="vSenha" placeholder="Senha">
+    <button onclick="criarVendedor()">Criar</button>
+  </div>
+
+</div>
+
+<div id="estoque" class="hidden"></div>
+</div>
+
+<div class="menu hidden" id="menu">
+  <button onclick="verEstoque()">Estoque</button>
+  <button id="btnGerente" onclick="verGerente()">Gerente</button>
+  <button onclick="sair()">Sair</button>
+</div>
+
+<script>
+/* 🔥 FIREBASE CONFIG (SUBSTITUA PELOS SEUS DADOS) */
+const firebaseConfig = {
+  apiKey: "AIzaSyDSPIq4Xgf_ZeSUZYTwgc2TzchgWSeUNOQ",
+  authDomain: "estoque-innovar.firebaseapp.com",
+  databaseURL: "https://estoque-innovar-default-rtdb.firebaseio.com",
+  projectId: "estoque-innovar",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* DADOS */
+let usuarioAtual=null;
+
+/* LOGIN FIXO GERENTE */
+const usuariosRef=db.ref("usuarios");
+usuariosRef.once("value",snap=>{
+  if(!snap.exists()){
+    usuariosRef.set({
+      gerente:{login:"gerente",senha:"1234",perfil:"gerente",nome:"Gerente"}
+    });
+  }
+});
+
+/* LOGIN */
+function entrar(){
+  usuariosRef.once("value",snap=>{
+    const users=snap.val();
+    Object.values(users).forEach(u=>{
+      if(u.login===luser.value && u.senha===lpass.value){
+        usuarioAtual=u;
+        login.classList.add("hidden");
+        menu.classList.remove("hidden");
+        if(u.perfil!=="gerente")btnGerente.style.display="none";
+        verEstoque();
+      }
+    });
+  });
+}
+
+function criarVendedor(){
+  const id=Date.now();
+  usuariosRef.child(id).set({
+    nome:vNome.value,
+    login:vLogin.value,
+    senha:vSenha.value,
+    perfil:"vendedor"
+  });
+  alert("Vendedor criado");
+}
+
+/* ESTOQUE EM TEMPO REAL */
+const motosRef=db.ref("motos");
+motosRef.on("value",snap=>{
+  const data=snap.val();
+  estoque.innerHTML="";
+  if(!data)return;
+  Object.values(data).forEach(m=>{
+    estoque.innerHTML+=`
+    <div class="card item">
+      <img src="${m.foto}">
+      <div>
+        <b>${m.modelo}</b><br>
+        R$ ${m.preco}<br>
+        <span class="status ${m.status}">${m.status}</span><br>
+        <small>${m.responsavel||""}</small><br>
+        <select onchange="mudarStatus('${m.id}',this.value)">
+          <option ${m.status=="Disponível"?"selected":""}>Disponível</option>
+          <option ${m.status=="Negociando"?"selected":""}>Negociando</option>
+          <option ${m.status=="Reservada"?"selected":""}>Reservada</option>
+          <option ${m.status=="Vendida"?"selected":""}>Vendida</option>
+        </select>
+      </div>
+    </div>`;
+  });
+});
+
+function mudarStatus(id,s){
+  motosRef.child(id).update({
+    status:s,
+    responsavel:usuarioAtual.nome
+  });
+}
+
+function verEstoque(){
+  gerente.classList.add("hidden");
+  estoque.classList.remove("hidden");
+}
+
+function verGerente(){
+  gerente.classList.remove("hidden");
+  estoque.classList.add("hidden");
+}
+
+function sair(){location.reload();}
+</script>
+
+</body>
+</html>
