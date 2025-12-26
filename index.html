@@ -5,53 +5,37 @@
 <title>Innovar | Estoque de Motos</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
 <style>
 :root{
   --verde:#1fa37a;
   --verde-escuro:#0f5f46;
   --cinza:#f2f2f2;
-  --branco:#fff;
 }
 
-body{
-  margin:0;
-  font-family:Arial, sans-serif;
-  background:var(--cinza);
-}
+body{margin:0;font-family:Arial;background:var(--cinza)}
 
 header{
   background:linear-gradient(135deg,var(--verde),var(--verde-escuro));
-  padding:12px;
+  padding:15px;
   text-align:center;
 }
+header img{height:45px}
 
-header img{
-  height:48px;
-}
-
-.container{
-  padding:15px;
-  margin-bottom:90px;
-}
+.container{padding:15px;margin-bottom:90px}
 
 .card{
-  background:var(--branco);
+  background:#fff;
   padding:15px;
-  border-radius:14px;
+  border-radius:12px;
   margin-bottom:15px;
 }
 
 input,select,button{
   width:100%;
-  padding:12px;
+  padding:10px;
   margin-top:8px;
-  border-radius:8px;
+  border-radius:6px;
   border:1px solid #ccc;
-  font-size:16px;
 }
 
 button{
@@ -76,48 +60,59 @@ button{
 
 .item{
   display:flex;
-  gap:12px;
+  gap:10px;
 }
 
 .item img{
-  width:110px;
-  height:85px;
+  width:100px;
+  height:80px;
   object-fit:cover;
-  border-radius:10px;
+  border-radius:8px;
 }
 
 .status{
-  padding:5px 10px;
-  border-radius:6px;
+  padding:4px 8px;
+  border-radius:5px;
   color:#fff;
-  font-size:13px;
-  display:inline-block;
-  margin-top:4px;
+  font-size:12px;
 }
 
 .Disponível{background:#2ecc71}
 .Negociando{background:#f39c12}
 .Reservada{background:#f1c40f;color:#000}
 .Vendida{background:#e74c3c}
+
+.lista-user{
+  padding:8px;
+  border-bottom:1px solid #ddd;
+}
 </style>
 </head>
 
 <body>
 
 <header>
-  <!-- LOGO EMBUTIDA -->
-  <img src="data:image/png;base64,COLE_AQUI_A_BASE64_DA_LOGO">
+  <img src="logo.png">
 </header>
 
 <div class="container">
 
+<!-- LOGIN -->
 <div id="login" class="card">
   <input id="luser" placeholder="Login">
   <input id="lpass" type="password" placeholder="Senha">
   <button onclick="entrar()">Entrar</button>
 </div>
 
+<!-- GERENTE -->
 <div id="gerente" class="hidden">
+
+  <div class="card">
+    <h3>Alterar login do gerente</h3>
+    <input id="novoLogin" placeholder="Novo login">
+    <input id="novaSenha" placeholder="Nova senha">
+    <button onclick="alterarGerente()">Salvar</button>
+  </div>
 
   <div class="card">
     <h3>Criar vendedor</h3>
@@ -127,9 +122,24 @@ button{
     <button onclick="criarVendedor()">Criar</button>
   </div>
 
+  <div class="card">
+    <h3>Vendedores cadastrados</h3>
+    <div id="listaVendedores"></div>
+  </div>
+
+  <div class="card">
+    <h3>Cadastrar moto</h3>
+    <input id="modelo" placeholder="Modelo">
+    <input id="preco" placeholder="Preço">
+    <input type="file" id="foto" accept="image/*">
+    <button onclick="salvarMoto()">Salvar</button>
+  </div>
+
 </div>
 
+<!-- ESTOQUE -->
 <div id="estoque" class="hidden"></div>
+
 </div>
 
 <div class="menu hidden" id="menu">
@@ -139,63 +149,86 @@ button{
 </div>
 
 <script>
-/* 🔥 FIREBASE CONFIG (SUBSTITUA PELOS SEUS DADOS) */
-const firebaseConfig = {
-  apiKey: "AIzaSyDSPIq4Xgf_ZeSUZYTwgc2TzchgWSeUNOQ",
-  authDomain: "estoque-innovar.firebaseapp.com",
-  databaseURL: "https://estoque-innovar-default-rtdb.firebaseio.com",
-  projectId: "estoque-innovar",
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+let usuarios = JSON.parse(localStorage.getItem("usuarios")) || [
+  {id:1,nome:"Gerente",login:"gerente",senha:"1234",perfil:"gerente"}
+];
 
-/* DADOS */
-let usuarioAtual=null;
+let motos = JSON.parse(localStorage.getItem("motos")) || [];
+let usuarioAtual = null;
 
-/* LOGIN FIXO GERENTE */
-const usuariosRef=db.ref("usuarios");
-usuariosRef.once("value",snap=>{
-  if(!snap.exists()){
-    usuariosRef.set({
-      gerente:{login:"gerente",senha:"1234",perfil:"gerente",nome:"Gerente"}
-    });
-  }
-});
+function salvar(){
+  localStorage.setItem("usuarios",JSON.stringify(usuarios));
+  localStorage.setItem("motos",JSON.stringify(motos));
+}
 
-/* LOGIN */
 function entrar(){
-  usuariosRef.once("value",snap=>{
-    const users=snap.val();
-    Object.values(users).forEach(u=>{
-      if(u.login===luser.value && u.senha===lpass.value){
-        usuarioAtual=u;
-        login.classList.add("hidden");
-        menu.classList.remove("hidden");
-        if(u.perfil!=="gerente")btnGerente.style.display="none";
-        verEstoque();
-      }
-    });
-  });
+  let u = usuarios.find(u=>u.login===luser.value && u.senha===lpass.value);
+  if(!u){alert("Login inválido");return;}
+  usuarioAtual=u;
+  login.classList.add("hidden");
+  menu.classList.remove("hidden");
+  if(u.perfil!=="gerente") btnGerente.style.display="none";
+  verEstoque();
+}
+
+function verGerente(){
+  gerente.classList.remove("hidden");
+  estoque.classList.add("hidden");
+  listarVendedores();
+}
+
+function alterarGerente(){
+  usuarioAtual.login=novoLogin.value||usuarioAtual.login;
+  usuarioAtual.senha=novaSenha.value||usuarioAtual.senha;
+  salvar();
+  alert("Dados atualizados");
 }
 
 function criarVendedor(){
-  const id=Date.now();
-  usuariosRef.child(id).set({
+  usuarios.push({
+    id:Date.now(),
     nome:vNome.value,
     login:vLogin.value,
     senha:vSenha.value,
     perfil:"vendedor"
   });
-  alert("Vendedor criado");
+  salvar();
+  listarVendedores();
 }
 
-/* ESTOQUE EM TEMPO REAL */
-const motosRef=db.ref("motos");
-motosRef.on("value",snap=>{
-  const data=snap.val();
+function listarVendedores(){
+  listaVendedores.innerHTML="";
+  usuarios.filter(u=>u.perfil==="vendedor").forEach(v=>{
+    listaVendedores.innerHTML+=`
+      <div class="lista-user">
+        <b>${v.nome}</b><br>
+        <small>Login: ${v.login}</small>
+      </div>`;
+  });
+}
+
+function salvarMoto(){
+  let r=new FileReader();
+  r.onload=e=>{
+    motos.push({
+      id:Date.now(),
+      modelo:modelo.value,
+      preco:preco.value,
+      foto:e.target.result,
+      status:"Disponível",
+      responsavel:"—"
+    });
+    salvar();
+    alert("Moto cadastrada");
+  };
+  r.readAsDataURL(foto.files[0]);
+}
+
+function verEstoque(){
+  gerente.classList.add("hidden");
+  estoque.classList.remove("hidden");
   estoque.innerHTML="";
-  if(!data)return;
-  Object.values(data).forEach(m=>{
+  motos.forEach(m=>{
     estoque.innerHTML+=`
     <div class="card item">
       <img src="${m.foto}">
@@ -203,8 +236,8 @@ motosRef.on("value",snap=>{
         <b>${m.modelo}</b><br>
         R$ ${m.preco}<br>
         <span class="status ${m.status}">${m.status}</span><br>
-        <small>${m.responsavel||""}</small><br>
-        <select onchange="mudarStatus('${m.id}',this.value)">
+        <small>${m.responsavel}</small><br>
+        <select onchange="mudarStatus(${m.id},this.value)">
           <option ${m.status=="Disponível"?"selected":""}>Disponível</option>
           <option ${m.status=="Negociando"?"selected":""}>Negociando</option>
           <option ${m.status=="Reservada"?"selected":""}>Reservada</option>
@@ -213,23 +246,13 @@ motosRef.on("value",snap=>{
       </div>
     </div>`;
   });
-});
+}
 
 function mudarStatus(id,s){
-  motosRef.child(id).update({
-    status:s,
-    responsavel:usuarioAtual.nome
-  });
-}
-
-function verEstoque(){
-  gerente.classList.add("hidden");
-  estoque.classList.remove("hidden");
-}
-
-function verGerente(){
-  gerente.classList.remove("hidden");
-  estoque.classList.add("hidden");
+  let m=motos.find(m=>m.id===id);
+  m.status=s;
+  m.responsavel=usuarioAtual.nome;
+  salvar();
 }
 
 function sair(){location.reload();}
